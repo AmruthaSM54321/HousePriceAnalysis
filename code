@@ -1,0 +1,74 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly.express as px
+
+df = pd.read_excel("bengaluru_house_prices.xlsx")
+df.head()
+df.info()
+df.describe()
+df.isnull().sum()
+
+null_percent = df.isnull().mean() * 100
+null_df = pd.DataFrame({'Column': df.columns, 'Null %': null_percent})
+null_df.sort_values('Null %', ascending=False)
+
+df = df.drop(columns=null_percent[null_percent > 50].index)
+df = df[df.isnull().mean(axis=1) < 0.3]
+df['balcony'] = df['balcony'].fillna(0)
+df['bath'] = df['bath'].fillna(df['bath'].median())
+df['bhk'] = df['size'].str.extract(r'(\d+)').astype(float)
+
+
+def convert_sqft(value):
+    try:
+        if '-' in value:
+            low, high = value.split('-')
+            return (float(low) + float(high)) / 2
+        return float(value)
+    except:
+        return None
+
+df['total_sqft'] = df['total_sqft'].apply(convert_sqft)
+
+df['price_per_sqft'] = (df['price'] * 100000) / df['total_sqft']
+sns.boxplot(x='bhk', y='price', data=df)
+
+
+#YOY MOM analysis
+
+# df['date'] = pd.to_datetime(df['date_column'])
+# df.set_index('date', inplace=True)
+
+# YoY
+# yoy = df['price'].resample('Y').mean()
+# yoy.pct_change().plot(kind='bar')
+
+df['area_type'].value_counts().plot(kind='pie', autopct='%1.1f%%')
+
+
+df['area_type'] = df['area_type'].str.replace(r'\s+', ' ', regex=True).str.strip()
+df['area_type'] = df['area_type'].str.replace(r'\s+', ' ', regex=True).str.strip()
+super_df = df[df['area_type'] == 'Super built-up Area']
+plot_df = df[df['area_type'] == 'Plot Area']
+
+print("Super built-up Area count:", super_df.shape[0])
+print("Plot Area count:", plot_df.shape[0])
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+fig, axs = plt.subplots(1, 2, figsize=(15, 5))
+
+sns.histplot(super_df['price'].dropna(), ax=axs[0], kde=True, color='orange')
+axs[0].set_title('Super built-up Area')
+
+sns.histplot(plot_df['price'].dropna(), ax=axs[1], kde=True, color='green')
+axs[1].set_title('Plot Area')
+
+plt.tight_layout()
+plt.show()
+df = df[df['price_per_sqft'] < df['price_per_sqft'].quantile(0.95)]
+sns.boxplot(x=df['price_per_sqft'])
+
